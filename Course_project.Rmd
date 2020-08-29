@@ -1,0 +1,85 @@
+---
+title: "Practical Machine Learning - Course Project"
+author: "edgarodriguez"
+date: "8/28/2020"
+output: html_document
+---
+---
+
+This documentation in part of the practical machine learning Course Project.
+# Background
+This data is from accelerometers of 6 participants. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+```{r echo=FALSE}
+library(caret)
+library(rattle)
+library(rpart)
+library(randomForest)
+library(gbm)
+```
+
+## Data source
+```{r}
+training_data_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testing_data_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+```
+
+```{r echo=FALSE}
+training_data <- read.csv(url(training_data_url ))
+testing_data <- read.csv(url(testing_data_url ))
+```
+
+## Exploratory analysis
+Variables near to zero and na columns are omitted, reducing to 52 predictors
+
+```{r}
+nzv <- nearZeroVar(training_data)
+training_data <- training_data[,-nzv]
+testing_data <- testing_data[,-nzv]
+#omitting na values columns
+no_na <- which(colSums(is.na(training_data) |training_data=="")>0.95*dim(training_data)[1]) 
+train_data <- training_data[,-no_na]
+dim(train_data)
+
+no_na <- which(colSums(is.na(testing_data) |testing_data=="")>0.95*dim(testing_data)[1]) 
+test_data <- testing_data[,-no_na]
+
+dim(test_data)
+```
+
+# Data spliting and control validation '5'
+```{r}
+set.seed(123)
+inTrain <- createDataPartition(y=train_data$classe, p=0.6,list=FALSE)
+Training <- train_data[inTrain,]
+Testing <- train_data[-inTrain,]
+dim(Training)
+dim(Testing)
+fitC <- trainControl(method = "cv",number = 5)
+```
+# Model Construction 
+
+Now, we will make a model using cross validation with gradient Boosting (gbm) and random forest (rf).
+
+```{r}
+gbm_model<- train(classe ~. , data=Training, method= "gbm",trControl=fitC,verbose=FALSE)
+plot(gbm_model)
+rf_model<- train(classe ~. , data=Training, method= "rf",trControl=fitC,verbose=FALSE)
+gbm_prediction<- predict(gbm_model, Testing)
+rf_prediction<- predict(rf_model, Testing)
+plot(rf_model,main="Accuracy of Random forest model by number of predictors")
+```
+
+The performance of both models:
+```{r}
+gbm_cm<-confusionMatrix(table(gbm_prediction, Testing$classe))$overall[1]
+rf_cm<-confusionMatrix(table(rf_prediction, Testing$classe))$overall[1]
+acc <- c(gbm_cm,rf_cm)
+names(acc) <- c("Gradient Boosting","Random Forest")
+#Accuracy
+acc
+
+```
+
+# Conclusion
+From both models (GBM and RF) we obtain accuracy > 99%.
